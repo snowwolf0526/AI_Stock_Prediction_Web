@@ -12,7 +12,7 @@ raw_ticker = st.text_input("🎯 輸入台股代號 (如: 2330, 2454, 0050)", va
 if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
     with st.spinner('正在呼叫 FastAPI 後端進行深度運算，請稍候...'):
         try:
-            api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={raw_ticker.strip()}"
+            api_url = f"https://ai-stock-prediction-web.onrender.com/api/v1/predict?ticker={raw_ticker.strip()}"
             response = requests.get(api_url)
             
             if response.status_code == 200:
