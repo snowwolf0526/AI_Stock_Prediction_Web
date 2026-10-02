@@ -1,12 +1,12 @@
 import yfinance as yf
 import pandas as pd
 import feedparser
-from snownlp import SnowNLP
 from datetime import datetime, timedelta
 import json
 import re
 import os
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
 
