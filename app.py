@@ -17,7 +17,8 @@ raw_ticker = st.text_input("🎯 輸入台股代號 (如: 2330, 2454, 0050)", va
 if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
     with st.spinner('正在呼叫 FastAPI 後端進行深度運算，請稍候...'):
         try:
-            api_url = f"https://ai-stock-prediction-web.onrender.com/api/v1/predict?ticker={raw_ticker.strip()}"
+            # 關鍵修改：將 API 網址指向你筆電的本地端 FastAPI (127.0.0.1:8000)
+            api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={raw_ticker.strip()}"
             response = requests.get(api_url)
             
             if response.status_code == 200:
@@ -120,12 +121,12 @@ if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
     status_text = st.empty()
     
     for i, ticker in enumerate(target_stocks):
-        status_text.text(f"🔍 正在呼叫 Render 微服務分析標的：{ticker}...")
+        status_text.text(f"🔍 正在呼叫本地端微服務分析標的：{ticker}...")
         
-        api_url = f"https://ai-stock-prediction-web.onrender.com/api/v1/predict?ticker={ticker}"
+        # 關鍵修改：將 API 網址指向你筆電的本地端 FastAPI (127.0.0.1:8000)
+        api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={ticker}"
         
         try:
-            # 拉長 timeout 容忍度
             response = requests.get(api_url, timeout=40)
             if response.status_code == 200:
                 data = response.json()
@@ -137,14 +138,11 @@ if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
                     "建議持倉水位": f"{data.get('recommended_position', 0):.1f}%"
                 })
             else:
-                # 顯示實際錯誤碼
                 st.warning(f"標的 {ticker} 分析失敗 (HTTP {response.status_code})")
         except Exception as e:
             st.warning(f"標的 {ticker} 連線超時或異常")
             
         progress_bar.progress((i + 1) / len(target_stocks))
-        
-        # 關鍵修正：給予 5 秒冷卻時間
         time.sleep(5)
         
     status_text.text("✅ 策略掃描完成！")

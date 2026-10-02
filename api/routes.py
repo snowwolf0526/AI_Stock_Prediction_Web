@@ -1,3 +1,5 @@
+from fastapi import HTTPException
+import traceback
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pandas_ta as ta
@@ -110,5 +112,9 @@ async def predict_stock(ticker: str):
         RESPONSE_CACHE[clean_ticker] = (final_response, current_time)
         return final_response
         
+    except HTTPException as he:
+        # 新增這兩行：如果是我們自己拋出的 400 錯誤，直接放行，不要變成 500
+        raise he 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"伺服器內部錯誤: {str(e)}")
