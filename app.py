@@ -113,7 +113,6 @@ st.subheader("🔥 AI 動態選股池 (MVP 掃描版)")
 st.write("一鍵掃描台股重點權值股，尋找今日最具潛力的強勢標的。")
 
 if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
-    # 挑選 5 檔涵蓋半導體、AI 伺服器、金融的代表性標的
     target_stocks = ["2330", "2317", "2454", "2308", "2881"] 
     results = []
     
@@ -126,7 +125,8 @@ if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
         api_url = f"https://ai-stock-prediction-web.onrender.com/api/v1/predict?ticker={ticker}"
         
         try:
-            response = requests.get(api_url, timeout=30)
+            # 拉長 timeout 容忍度
+            response = requests.get(api_url, timeout=40)
             if response.status_code == 200:
                 data = response.json()
                 
@@ -137,16 +137,18 @@ if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
                     "建議持倉水位": f"{data.get('recommended_position', 0):.1f}%"
                 })
             else:
-                st.warning(f"標的 {ticker} 分析失敗")
+                # 顯示實際錯誤碼
+                st.warning(f"標的 {ticker} 分析失敗 (HTTP {response.status_code})")
         except Exception as e:
-            st.warning(f"標的 {ticker} 連線超時")
+            st.warning(f"標的 {ticker} 連線超時或異常")
             
         progress_bar.progress((i + 1) / len(target_stocks))
-        time.sleep(0.5)
+        
+        # 關鍵修正：給予 5 秒冷卻時間
+        time.sleep(5)
         
     status_text.text("✅ 策略掃描完成！")
     
     if results:
-        # 將結果轉為 DataFrame 並直接顯示
         df = pd.DataFrame(results)
         st.dataframe(df, use_container_width=True)
