@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
+import time
+import pandas as pd
 
 st.set_page_config(page_title="AI 股市預測系統", layout="wide")
 
@@ -9,6 +11,9 @@ st.markdown("本系統已全面重構為 **前後端分離架構**。前端只�
 
 raw_ticker = st.text_input("🎯 輸入台股代號 (如: 2330, 2454, 0050)", value="2330", max_chars=8)
 
+# ==========================================
+# 區塊一：單一標的深度預測
+# ==========================================
 if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
     with st.spinner('正在呼叫 FastAPI 後端進行深度運算，請稍候...'):
         try:
@@ -19,7 +24,7 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
                 data = response.json()
                 st.success(f"✅ API 呼叫成功！標的：{data['company_name']} ({data['ticker']})")
                 
-                # 🆕 --- 新增：資金部位控管儀表板 ---
+                # --- 資金部位控管儀表板 ---
                 st.markdown("### 💰 AI 動態資金控管建議 (Position Sizing)")
                 rec_pos = data['recommended_position']
                 
@@ -98,3 +103,50 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
             st.error("⚠️ 連線不到後端 API！請確認你的 FastAPI 伺服器 (uvicorn) 是否有在另一個終端機開啟。")
         except Exception as e:
             st.error(f"發生未預期的錯誤：{e}")
+
+
+# ==========================================
+# 區塊二：動態選股池 (MVP 掃描版)
+# ==========================================
+st.markdown("---")
+st.subheader("🔥 AI 動態選股池 (MVP 掃描版)")
+st.write("一鍵掃描台股重點權值股，尋找今日最具潛力的強勢標的。")
+
+if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
+    # 挑選 5 檔涵蓋半導體、AI 伺服器、金融的代表性標的
+    target_stocks = ["2330", "2317", "2454", "2308", "2881"] 
+    results = []
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i, ticker in enumerate(target_stocks):
+        status_text.text(f"🔍 正在呼叫 Render 微服務分析標的：{ticker}...")
+        
+        api_url = f"https://ai-stock-prediction-web.onrender.com/api/v1/predict?ticker={ticker}"
+        
+        try:
+            response = requests.get(api_url, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                
+                results.append({
+                    "股票代號": f"{data.get('company_name', ticker)} ({ticker})",
+                    "AI 預測方向": data.get("prediction", "未知"),
+                    "模型信心度": f"{data.get('confidence', 0):.1f}%",
+                    "建議持倉水位": f"{data.get('recommended_position', 0):.1f}%"
+                })
+            else:
+                st.warning(f"標的 {ticker} 分析失敗")
+        except Exception as e:
+            st.warning(f"標的 {ticker} 連線超時")
+            
+        progress_bar.progress((i + 1) / len(target_stocks))
+        time.sleep(0.5)
+        
+    status_text.text("✅ 策略掃描完成！")
+    
+    if results:
+        # 將結果轉為 DataFrame 並直接顯示
+        df = pd.DataFrame(results)
+        st.dataframe(df, use_container_width=True)
