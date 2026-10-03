@@ -9,6 +9,16 @@ st.set_page_config(page_title="AI 股市預測系統", layout="wide")
 st.title("📈 畢業專題：AI 股市預測系統 (微服務架構版)")
 st.markdown("本系統已全面重構為 **前後端分離架構**。前端只負責介面展示，核心運算與 AI 報告皆由 FastAPI 後端微服務即時運算並回傳。")
 
+# 💡 建立全域共用的台股中文名稱對照表
+STOCK_MAPPING = {
+    "2330": "台積電",
+    "2317": "鴻海",
+    "2454": "聯發科",
+    "2308": "台達電",
+    "2881": "富邦金",
+    "0050": "元大台灣50"
+}
+
 raw_ticker = st.text_input("🎯 輸入台股代號 (如: 2330, 2454, 0050)", value="2330", max_chars=8)
 
 # ==========================================
@@ -17,19 +27,22 @@ raw_ticker = st.text_input("🎯 輸入台股代號 (如: 2330, 2454, 0050)", va
 if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
     with st.spinner('正在呼叫 FastAPI 後端進行深度運算，請稍候...'):
         try:
-            # 關鍵修改：將 API 網址指向你筆電的本地端 FastAPI (127.0.0.1:8000)
-            api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={raw_ticker.strip()}"
+            input_ticker = raw_ticker.strip()
+            api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={input_ticker}"
             response = requests.get(api_url)
             
             if response.status_code == 200:
                 data = response.json()
-                st.success(f"✅ API 呼叫成功！標的：{data['company_name']} ({data['ticker']})")
+                
+                # 從對照表抓取中文名稱，若無則使用後端回傳值
+                c_name = STOCK_MAPPING.get(input_ticker, data.get('company_name', input_ticker))
+                
+                st.success(f"✅ API 呼叫成功！標的：{c_name} ({data['ticker']})")
                 
                 # --- 資金部位控管儀表板 ---
                 st.markdown("### 💰 AI 動態資金控管建議 (Position Sizing)")
                 rec_pos = data['recommended_position']
                 
-                # 依據水位給予不同顏色提示
                 if rec_pos >= 75:
                     pos_color, pos_text = "green", "積極建倉 (模型高度確信)"
                 elif rec_pos >= 30:
@@ -43,14 +56,14 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
                 
                 # --- 頂部數據儀表板 ---
                 st.markdown("### 🔮 預測與核心績效")
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
+                col1_m, col2_m, col3_m, col4_m = st.columns(4)
+                with col1_m:
                     st.metric(label="預測方向", value=f"{data['prediction']} " + ("📈" if data['prediction']=="上漲" else "📉"))
-                with col2:
+                with col2_m:
                     st.metric(label="聯合模型信心", value=f"{data['confidence']:.1f}%")
-                with col3:
+                with col3_m:
                     st.metric(label="AI 策略報酬", value=f"{data['strategy_roi']:.2f}%")
-                with col4:
+                with col4_m:
                     st.metric(label="大盤持有報酬", value=f"{data['market_roi']:.2f}%")
                 
                 # --- 進階風險控管指標 ---
@@ -76,7 +89,9 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
                 fig_k = go.Figure(data=[go.Candlestick(x=hist['Date'], open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], name='K線')])
                 fig_k.add_trace(go.Scatter(x=hist['Date'], y=hist['SMA_5'], line=dict(color='orange', width=1.5), name='5日均線'))
                 fig_k.add_trace(go.Scatter(x=hist['Date'], y=hist['SMA_10'], line=dict(color='blue', width=1.5), name='10日均線'))
-                fig_k.update_layout(title=f"{data['company_name']} 近 90 日走勢與均線", yaxis_title='股價 (TWD)', template='plotly_white', height=450)
+                
+                # 固定使用 plotly_white 亮色主題
+                fig_k.update_layout(title=f"{c_name} 近 90 日走勢與均線", yaxis_title='股價 (TWD)', template="plotly_white", height=450)
                 st.plotly_chart(fig_k, use_container_width=True)
                 
                 col_chart1, col_chart2 = st.columns(2)
@@ -84,7 +99,7 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
                 with col_chart1:
                     imp = data['importance_data']
                     fig_imp = go.Figure(go.Bar(x=imp['重要性'], y=imp['特徵'], orientation='h', marker=dict(color='teal')))
-                    fig_imp.update_layout(title='XGBoost 決策關鍵特徵權重', template='plotly_white', height=350)
+                    fig_imp.update_layout(title='XGBoost 決策關鍵特徵權重', template="plotly_white", height=350)
                     st.plotly_chart(fig_imp, use_container_width=True)
                     
                 with col_chart2:
@@ -93,7 +108,7 @@ if st.button("🚀 呼叫後端 API 進行預測", type="primary"):
                         fig_bt = go.Figure()
                         fig_bt.add_trace(go.Scatter(x=bt['Date'], y=bt['Cum_Strategy'], line=dict(color='red', width=2.5), name='AI 策略 (含動態部位)'))
                         fig_bt.add_trace(go.Scatter(x=bt['Date'], y=bt['Cum_Market'], line=dict(color='gray', width=1.5, dash='dash'), name='單純持有'))
-                        fig_bt.update_layout(title='近半年歷史回測：動態資金 AI 策略 vs 大盤', yaxis_title='累積資產倍數', template='plotly_white', height=350, hovermode='x unified')
+                        fig_bt.update_layout(title='近半年歷史回測：動態資金 AI 策略 vs 大盤', yaxis_title='累積資產倍數', template="plotly_white", height=350, hovermode='x unified')
                         st.plotly_chart(fig_bt, use_container_width=True)
                 
             else:
@@ -113,7 +128,7 @@ st.markdown("---")
 st.subheader("🔥 AI 動態選股池 (MVP 掃描版)")
 st.write("一鍵掃描台股重點權值股，尋找今日最具潛力的強勢標的。")
 
-if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
+if st.button("🚀 啟動 AI 策略掃描", type="primary", use_container_width=True):
     target_stocks = ["2330", "2317", "2454", "2308", "2881"] 
     results = []
     
@@ -121,32 +136,81 @@ if st.button("🚀 啟動 AI 策略掃描", type="secondary"):
     status_text = st.empty()
     
     for i, ticker in enumerate(target_stocks):
-        status_text.text(f"🔍 正在呼叫本地端微服務分析標的：{ticker}...")
+        c_name = STOCK_MAPPING.get(ticker, ticker)
+        status_text.markdown(f"**🔍 正在分析標的：{c_name} ({ticker})...**")
         
-        # 關鍵修改：將 API 網址指向你筆電的本地端 FastAPI (127.0.0.1:8000)
         api_url = f"http://127.0.0.1:8000/api/v1/predict?ticker={ticker}"
         
         try:
             response = requests.get(api_url, timeout=40)
             if response.status_code == 200:
                 data = response.json()
-                
                 results.append({
-                    "股票代號": f"{data.get('company_name', ticker)} ({ticker})",
-                    "AI 預測方向": data.get("prediction", "未知"),
-                    "模型信心度": f"{data.get('confidence', 0):.1f}%",
-                    "建議持倉水位": f"{data.get('recommended_position', 0):.1f}%"
+                    "ticker": ticker,
+                    "name": c_name,
+                    "prediction": data.get("prediction", "未知"),
+                    "confidence": float(data.get('confidence', 0)),
+                    "position": float(data.get('recommended_position', 0))
                 })
             else:
-                st.warning(f"標的 {ticker} 分析失敗 (HTTP {response.status_code})")
+                st.error(f"{c_name} ({ticker}) 分析失敗")
         except Exception as e:
-            st.warning(f"標的 {ticker} 連線超時或異常")
+            st.error(f"{c_name} ({ticker}) 連線異常")
             
         progress_bar.progress((i + 1) / len(target_stocks))
-        time.sleep(5)
+        time.sleep(0.3)
         
-    status_text.text("✅ 策略掃描完成！")
+    status_text.empty()
+    progress_bar.empty()
     
     if results:
-        df = pd.DataFrame(results)
-        st.dataframe(df, use_container_width=True)
+        st.markdown("### 📊 AI 策略掃描報告")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        for res in results:
+            if res['prediction'] == "上漲":
+                color = "#ef5350"
+                icon = "🚀"
+                trend_text = "強勢看多"
+            elif res['prediction'] == "下跌":
+                color = "#26a69a"
+                icon = "⚠️"
+                trend_text = "風險看空"
+            else:
+                color = "#888888"
+                icon = "⏸️"
+                trend_text = "中立觀望"
+
+            # 固定為白底黑字的安全卡片風格
+            card_html = f'''
+            <div style="
+                border: 1px solid var(--secondary-background-color);
+                border-radius: 12px;
+                padding: 16px 24px;
+                margin-bottom: 16px;
+                background-color: #FFFFFF;
+                color: #000000;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            ">
+                <div style="flex: 1.5;">
+                    <h3 style="margin: 0; font-size: 22px; color: #000000;">{res['name']} <span style="font-size: 14px; opacity: 0.6; font-weight: normal;">{res['ticker']}</span></h3>
+                </div>
+                <div style="flex: 1.5; text-align: center;">
+                    <span style="color: {color}; border: 1.5px solid {color}; padding: 6px 18px; border-radius: 30px; font-weight: 600; font-size: 15px; letter-spacing: 1px;">
+                        {icon} {trend_text}
+                    </span>
+                </div>
+                <div style="flex: 1; text-align: right;">
+                    <div style="font-size: 13px; opacity: 0.6; margin-bottom: 4px;">模型信心度</div>
+                    <div style="font-weight: 600; font-size: 18px;">{res['confidence']:.1f}%</div>
+                </div>
+                <div style="flex: 1; text-align: right;">
+                    <div style="font-size: 13px; opacity: 0.6; margin-bottom: 4px;">動態持倉水位</div>
+                    <div style="font-weight: 900; font-size: 22px; color: {color};">{res['position']:.1f}%</div>
+                </div>
+            </div>
+            '''
+            st.markdown(card_html, unsafe_allow_html=True)
